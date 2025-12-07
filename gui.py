@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         side_layout.addStretch()
 
         # Profile
-        profile = QLabel("MB")
+        profile = QLabel("🤖")
         profile.setObjectName("profileBadge")
         profile.setAlignment(Qt.AlignCenter)
         profile.setFixedSize(40, 40)
@@ -127,12 +127,14 @@ class MainWindow(QMainWindow):
         self.main_splitter = QSplitter(Qt.Horizontal)
         self.main_splitter.setHandleWidth(6)
         main_layout.addWidget(self.main_splitter, stretch=1)
+        # self.main_splitter.setSizes([500, 800])  # pixels: 500px for processes, 800px for graphs+alerts
+
 
         # ------------------------------------------------------------------
         # LEFT CENTER: cards + process table
         # ------------------------------------------------------------------
-        center_container = QWidget()
-        center_layout = QVBoxLayout(center_container)
+        self.center_container = QWidget()
+        center_layout = QVBoxLayout(self.center_container)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(10)
 
@@ -151,9 +153,9 @@ class MainWindow(QMainWindow):
         center_layout.addLayout(cards_row)
 
         # Process table card
-        table_card = QFrame()
-        table_card.setObjectName("card")
-        table_layout = QVBoxLayout(table_card)
+        self.table_card = QFrame()
+        self.table_card.setObjectName("card")
+        table_layout = QVBoxLayout(self.table_card)
         table_layout.setContentsMargins(14, 10, 14, 12)
         table_layout.setSpacing(8)
 
@@ -190,22 +192,23 @@ class MainWindow(QMainWindow):
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         table_layout.addWidget(self.table)
-        center_layout.addWidget(table_card, stretch=1)
+        center_layout.addWidget(self.table_card, stretch=1)
 
-        self.main_splitter.addWidget(center_container)
-
+        self.main_splitter.addWidget(self.center_container)
+        self.center_container.setMinimumWidth(600)   # just to keep it usable
+        self.center_container.setMaximumWidth(650)   # make left panel smaller
         # ------------------------------------------------------------------
         # RIGHT PANEL: graphs + alerts
         # ------------------------------------------------------------------
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
+        self.right_panel = QWidget()
+        right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(10)
 
         # Graphs card
-        graphs_card = QFrame()
-        graphs_card.setObjectName("card")
-        graphs_layout = QVBoxLayout(graphs_card)
+        self.graphs_card = QFrame()
+        self.graphs_card.setObjectName("card")
+        graphs_layout = QVBoxLayout(self.graphs_card)
         graphs_layout.setContentsMargins(14, 10, 14, 10)
         graphs_layout.setSpacing(6)
 
@@ -217,12 +220,12 @@ class MainWindow(QMainWindow):
         self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         graphs_layout.addWidget(self.canvas)
 
-        right_layout.addWidget(graphs_card, stretch=2)
+        right_layout.addWidget(self.graphs_card, stretch=2)
 
         # Alerts card
-        alerts_card = QFrame()
-        alerts_card.setObjectName("card")
-        alerts_layout = QVBoxLayout(alerts_card)
+        self.alerts_card = QFrame()
+        self.alerts_card.setObjectName("card")
+        alerts_layout = QVBoxLayout(self.alerts_card)
         alerts_layout.setContentsMargins(14, 8, 14, 10)
         alerts_layout.setSpacing(6)
 
@@ -235,11 +238,11 @@ class MainWindow(QMainWindow):
         alerts_layout.addWidget(lbl_alerts)
         alerts_layout.addWidget(self.alert_list)
 
-        right_layout.addWidget(alerts_card, stretch=1)
+        right_layout.addWidget(self.alerts_card, stretch=1)
 
-        self.main_splitter.addWidget(right_panel)
-        self.main_splitter.setStretchFactor(0, 3)
-        self.main_splitter.setStretchFactor(1, 2)
+        self.main_splitter.addWidget(self.right_panel)
+        self.main_splitter.setStretchFactor(0, 2)
+        self.main_splitter.setStretchFactor(2, 3)
 
         # ===== Status bar =====
         status = QStatusBar()
@@ -248,6 +251,10 @@ class MainWindow(QMainWindow):
 
         # For filtering/sorting
         self._current_processes = []
+
+        # Current view
+        self.current_view = "Overview"
+        self.set_view_mode("Overview")
 
         # ===== Timer =====
         self.timer = QTimer(self)
@@ -337,7 +344,7 @@ class MainWindow(QMainWindow):
                 border-bottom: 1px solid #15192b;
             }
 
-            /* Alerts list – dark, no white alt rows */
+            /* Alerts list – dark */
             QListWidget {
                 background-color: #0d1122;
                 border-radius: 12px;
@@ -390,13 +397,21 @@ class MainWindow(QMainWindow):
                 background-color: #2563eb;
             }
 
-            /* Smaller Kill button */
+            /* Kill button – more rounded, centered look */
             QPushButton#killButton {
-                padding: 2px 6px;
-                font-size: 10px;
-                border-radius: 8px;
-                min-width: 40px;
-                max-width: 50px;
+                background-color: #2563eb;
+                border-radius: 16px;
+                padding: 4px 14px;
+                font-size: 11px;
+                font-weight: 600;
+                min-width: 52px;
+                max-width: 60px;
+            }
+            QPushButton#killButton:hover {
+                background-color: #3b82f6;
+            }
+            QPushButton#killButton:pressed {
+                background-color: #1d4ed8;
             }
 
             QStatusBar {
@@ -444,25 +459,52 @@ class MainWindow(QMainWindow):
         return card
 
     # ==================================================================
-    # Sidebar click handler (make it "do something")
+    # View mode handling (sidebar actions)
     # ==================================================================
+    def set_view_mode(self, mode: str):
+        """
+        Modes:
+          - Overview: everything visible
+          - Graphs: only graphs
+          - Processes: only process list / stat cards
+          - Alerts: only alerts
+        """
+        self.current_view = mode
+
+        if mode == "Overview":
+            self.center_container.show()
+            self.right_panel.show()
+            self.graphs_card.show()
+            self.alerts_card.show()
+            self.main_splitter.setSizes([500, 900])
+
+        elif mode == "Graphs":
+            self.center_container.hide()
+            self.right_panel.show()
+            self.graphs_card.show()
+            self.alerts_card.hide()
+            self.main_splitter.setSizes([0, 1])
+
+        elif mode == "Processes":
+            self.center_container.show()
+            self.right_panel.hide()
+            self.graphs_card.show()
+            self.alerts_card.show()
+            self.main_splitter.setSizes([0, 1])
+
+        elif mode == "Alerts":
+            self.center_container.hide()
+            self.right_panel.show()
+            self.graphs_card.hide()
+            self.alerts_card.show()
+            self.main_splitter.setSizes([0, 1])
+
     def handle_sidebar_click(self, section_name: str):
         """
-        Now actually focuses the relevant part of the UI + status message.
+        Switch view based on sidebar click.
         """
-        if section_name == "Graphs":
-            self.canvas.setFocus()
-            self.statusBar().showMessage("Graphs focused", 2000)
-        elif section_name == "Processes":
-            self.table.setFocus()
-            self.statusBar().showMessage("Process list focused", 2000)
-        elif section_name == "Alerts":
-            self.alert_list.setFocus()
-            self.statusBar().showMessage("Alerts focused", 2000)
-        else:  # Overview
-            # reset splitter to default proportions
-            self.main_splitter.setSizes([3, 2])
-            self.statusBar().showMessage("Overview", 2000)
+        self.set_view_mode(section_name)
+        self.statusBar().showMessage(f"{section_name} view", 2000)
 
     # ==================================================================
     # Refresh / update
@@ -575,10 +617,19 @@ class MainWindow(QMainWindow):
 
             btn_kill = QPushButton("Kill")
             btn_kill.setObjectName("killButton")
+
+            # Center the button inside the cell using a layout
+            cell_widget = QWidget()
+            h_layout = QHBoxLayout(cell_widget)
+            h_layout.setContentsMargins(0, 0, 0, 0)
+            h_layout.addStretch()
+            h_layout.addWidget(btn_kill)
+            h_layout.addStretch()
+
             btn_kill.clicked.connect(
                 lambda _, pid=proc["pid"], name=proc["name"]: self.handle_kill_process(pid, name)
             )
-            self.table.setCellWidget(row, 5, btn_kill)
+            self.table.setCellWidget(row, 5, cell_widget)
 
     # ==================================================================
     # Charts
@@ -610,6 +661,7 @@ class MainWindow(QMainWindow):
             self.canvas.axes_mem.set_ylabel("Memory %")
             self.canvas.axes_mem.set_ylim(0, 100)
             self.canvas.axes_mem.set_xlabel("Time")
+            self.canvas.axes_mem.setTitle = "Memory Usage (Recent)"
             self.canvas.axes_mem.set_title("Memory Usage (Recent)")
             self.canvas.axes_mem.grid(True, alpha=0.25)
             self.canvas.axes_mem.set_xticks(tick_positions)
