@@ -43,7 +43,7 @@ def get_process_list():
 
     # Sort by CPU usage descending
     processes.sort(key=lambda p: p["cpu_percent"], reverse=True)
-    return processes
+    return processes[:50]
 
 
 def kill_process(pid: int) -> bool:
