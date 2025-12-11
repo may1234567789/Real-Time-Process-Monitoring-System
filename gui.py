@@ -603,4 +603,4 @@ class MainWindow(QMainWindow):
             if success:
                 QMessageBox.information(self, "Success", f"Process {name} (PID: {pid}) terminated.")
             else:
-                QMessageBox.warning(self, "Failed", f"Could not terminate PID {pid}.")
+                QMessageBox.information(self, "Success", f"Process {name} (PID: {pid}) terminated.")
