@@ -239,6 +239,12 @@ class MainWindow(QMainWindow):
 
         # internal
         self._current_processes = []
+        # --- search pause control ---
+        self.search_active = False
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        self.search_timer.timeout.connect(self._resume_auto_refresh)
+
         self.current_view = "Overview"
         self.set_view_mode("Overview")
 
@@ -420,7 +426,9 @@ class MainWindow(QMainWindow):
         alerts = self.analytics.check_alerts(system_stats)
 
         self.update_system_labels_and_cards(system_stats, processes)
-        self._populate_table(processes)
+        # self._populate_table(processes)
+        if not self.search_active:
+            self._populate_table(processes)
         self.update_charts()
         self.update_alerts(alerts)
 
@@ -456,13 +464,28 @@ class MainWindow(QMainWindow):
     # ----------------- Table population -----------------
     def _filter_table(self):
         query = self.search_box.text().strip().lower()
+
+        # pause table auto-refresh while searching
+        self.search_active = True
+        self.search_timer.start(10000)  # 10 seconds
+
         if not self._current_processes:
             return
+
         if not query:
-            self._populate_table(self._current_processes)
+            self.search_active = False
             return
-        filtered = [p for p in self._current_processes if query in str(p["name"]).lower()]
+
+        filtered = [
+            p for p in self._current_processes
+            if query in str(p["name"]).lower()
+        ]
         self._populate_table(filtered)
+
+    def _resume_auto_refresh(self):
+        self.search_active = False
+
+
 
     def _sort_table(self):
         if not self._current_processes:
